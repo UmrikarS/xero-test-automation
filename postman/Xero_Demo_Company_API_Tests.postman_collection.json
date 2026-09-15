@@ -1,0 +1,284 @@
+{
+  "info": {
+    "name": "Xero Demo Company API Tests",
+    "description": "Postman equivalent of the endpoints and validation logic covered in tests/api/test_invoices_api.py. Kept in the same repo as the pytest suite so a reviewer can see the same test intent expressed two ways: scripted (pytest, run in CI) and manual/exploratory (Postman, run interactively while investigating a bug or exploring a new endpoint before automating it).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "https://api.xero.com/api.xro/2.0"
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "tenant_id",
+      "value": ""
+    },
+    {
+      "key": "created_invoice_id",
+      "value": ""
+    },
+    {
+      "key": "created_contact_id",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "Invoices",
+      "item": [
+        {
+          "name": "Create invoice - valid amount (equivalence: valid-typical)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Invoices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Invoices\": [\n    {\n      \"Type\": \"ACCREC\",\n      \"Contact\": { \"Name\": \"Postman Test Contact\" },\n      \"LineItems\": [\n        { \"Description\": \"Postman test item\", \"Quantity\": 1, \"UnitAmount\": 100.00, \"AccountCode\": \"200\" }\n      ]\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "pm.test('Invoice was created with correct total', () => {",
+                  "  pm.expect(body.Invoices[0].Total).to.eql(100.00);",
+                  "});",
+                  "if (body.Invoices && body.Invoices[0]) {",
+                  "  pm.collectionVariables.set('created_invoice_id', body.Invoices[0].InvoiceID);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create invoice - zero amount (equivalence: invalid boundary)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Invoices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Invoices\": [\n    {\n      \"Type\": \"ACCREC\",\n      \"Contact\": { \"Name\": \"Postman Test Contact\" },\n      \"LineItems\": [\n        { \"Description\": \"Zero amount boundary test\", \"Quantity\": 1, \"UnitAmount\": 0.00, \"AccountCode\": \"200\" }\n      ]\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const hasValidationError = pm.response.code === 400 || (body.Invoices && body.Invoices[0] && body.Invoices[0].ValidationErrors);",
+                  "pm.test('Zero amount is rejected as a validation error', () => {",
+                  "  pm.expect(hasValidationError).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create invoice - negative amount (equivalence: invalid)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Invoices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Invoices\": [\n    {\n      \"Type\": \"ACCREC\",\n      \"Contact\": { \"Name\": \"Postman Test Contact\" },\n      \"LineItems\": [\n        { \"Description\": \"Negative amount test\", \"Quantity\": 1, \"UnitAmount\": -50.00, \"AccountCode\": \"200\" }\n      ]\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const hasValidationError = pm.response.code === 400 || (body.Invoices && body.Invoices[0] && body.Invoices[0].ValidationErrors);",
+                  "pm.test('Negative amount is rejected as a validation error', () => {",
+                  "  pm.expect(hasValidationError).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Void created invoice (cleanup)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Invoices",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Invoices\": [\n    {\n      \"InvoiceID\": \"{{created_invoice_id}}\",\n      \"Status\": \"VOIDED\"\n    }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Invoice status is VOIDED', () => {",
+                  "  const body = pm.response.json();",
+                  "  pm.expect(body.Invoices[0].Status).to.eql('VOIDED');",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Contacts",
+      "item": [
+        {
+          "name": "Create contact - valid name",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Contacts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Contacts\": [\n    { \"Name\": \"Postman Automation Contact\" }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status code is 200', () => pm.response.to.have.status(200));",
+                  "const body = pm.response.json();",
+                  "if (body.Contacts && body.Contacts[0]) {",
+                  "  pm.collectionVariables.set('created_contact_id', body.Contacts[0].ContactID);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create contact - empty name (completeness rule)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Contacts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Contacts\": [\n    { \"Name\": \"\" }\n  ]\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const body = pm.response.json();",
+                  "const hasValidationError = pm.response.code === 400 || (body.Contacts && body.Contacts[0] && body.Contacts[0].ValidationErrors);",
+                  "pm.test('Empty contact name violates completeness rule', () => {",
+                  "  pm.expect(hasValidationError).to.be.true;",
+                  "});"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Archive created contact (cleanup)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{base_url}}/Contacts",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"Contacts\": [\n    { \"ContactID\": \"{{created_contact_id}}\", \"ContactStatus\": \"ARCHIVED\" }\n  ]\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

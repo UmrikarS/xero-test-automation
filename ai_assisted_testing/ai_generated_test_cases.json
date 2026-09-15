@@ -1,0 +1,69 @@
+{
+  "_meta": {
+    "generated_by": "Claude (Anthropic), prompted manually via claude.ai",
+    "reviewed_by": "human — every case below was checked against Xero API docs and either kept, edited, or discarded before use",
+    "prompt_used": "See generate_test_cases.py docstring for the exact prompt.",
+    "purpose": "Supplement the hand-written boundary cases in tests/api/test_invoices_api.py with additional edge cases an AI assistant suggested, to broaden coverage beyond what one person thinks of unassisted.",
+    "status_2026_09": "All originally-ambiguous cases except ai-003 have now been resolved through manual testing against the real Xero Demo Company (both UI and API) and converted from pytest.skip() into real assertions -- see individual review_note fields for what was found. ai-003 (amount sent as a JSON string) remains open at the API layer specifically; the UI-level input masking observed doesn't answer what the API does with a string-typed UnitAmount."
+  },
+  "invoice_amount_cases": [
+    {
+      "id": "ai-001",
+      "description": "Extremely large amount — tests for integer overflow or formatting bugs at scale",
+      "unit_amount": 999999999.99,
+      "expect_success": true,
+      "review_note": "Kept as-is. Xero's documented numeric field limits accommodate this; worth confirming the UI renders it without truncation."
+    },
+    {
+      "id": "ai-002",
+      "description": "Amount with more than 2 decimal places — tests rounding/truncation behaviour",
+      "unit_amount": 10.999,
+      "expect_success": true,
+      "review_note": "Manually verified via Xero's web UI (2026-09): entering 10.999 is accepted, not rejected -- Xero rounds rather than enforcing a hard 2-decimal-place limit. Promoted from 'ambiguous' to an active assertion, but note this is UI-observed behaviour; the API test below sends this value directly to the API's JSON payload, which is a genuinely separate validation path from the UI's number input. If the API test disagrees with this UI finding (e.g. rejects it, or rounds it differently), that itself is a real UI-vs-API validation discrepancy worth its own xfail finding, not a bug in this test."
+    },
+    {
+      "id": "ai-003",
+      "description": "Amount as a string instead of a number in the JSON payload — tests type coercion",
+      "unit_amount": "100.00",
+      "expect_success": "ambiguous",
+      "review_note": "Still genuinely ambiguous, and NOT resolved by the manual UI testing done so far. What was manually observed: the Xero web UI's amount field simply refuses to accept a quote character or any non-numeric keystroke at all -- that's client-side input masking on the text box, which happens before anything is ever sent as a request, and produced no server response to learn from. It says nothing about how Xero's API behaves when a JSON payload deliberately sends UnitAmount as the string \"100.00\" instead of the number 100.00, since that path never goes through a keyboard filter -- it's pure JSON parsing on Xero's server. Kept ambiguous specifically for the API layer; this project's own API test below (test_ai_generated_cases.py) actually exercises this exact scenario against the real API, so running pytest is what will resolve it, not more UI testing."
+    },
+    {
+      "id": "ai-004",
+      "description": "Amount just above the zero boundary at higher precision (0.001)",
+      "unit_amount": 0.001,
+      "expect_success": true,
+      "review_note": "Manually verified via Xero's web UI (2026-09): 0.001 is accepted, consistent with ai-002's finding that Xero doesn't hard-enforce 2 decimal places. Promoted from 'ambiguous'. Same caveat as ai-002 applies: this confirms UI behaviour, and the API test below is what actually confirms or contradicts it for the API layer specifically."
+    }
+  ],
+  "contact_name_cases": [
+    {
+      "id": "ai-005",
+      "description": "Name with only whitespace — tests whether trimming happens before the completeness check",
+      "name": "   ",
+      "expect_rejected": true,
+      "review_note": "Kept and considered an important addition — the hand-written test only covered a fully empty string, not a whitespace-only string that LOOKS non-empty to a naive length check."
+    },
+    {
+      "id": "ai-006",
+      "description": "Name with only emoji characters — tests Unicode handling and completeness rule interaction",
+      "name": "\ud83d\ude00\ud83d\udc4d",
+      "expect_rejected": false,
+      "review_note": "CONFIRMED via manual testing (2026-09): Xero accepts an emoji-only contact name without any validation error. Promoted from 'ambiguous' to an active assertion."
+    },
+    {
+      "id": "ai-007",
+      "description": "Name exactly at the confirmed maximum length boundary (255 characters)",
+      "name": "AutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAut",
+      "expect_rejected": false,
+      "review_note": "CONFIRMED via manual testing (2026-09): the original AI-generated string here was actually only 247 characters, not the intended 255 -- a miscount, fixed by regenerating it programmatically and verifying with len(). Manually typing 256 characters into the Xero UI produced a message limiting input to 255 characters, and 255 itself was accepted -- so this is the correct valid-side boundary value. Promoted from 'ambiguous' to an active assertion. See ai-009 for the paired invalid-side boundary (256 characters)."
+    },
+    {
+      "id": "ai-009",
+      "description": "Name one character over the confirmed maximum length boundary (256 characters)",
+      "name": "AutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAutomationBoundaryTestNameCharacterXAuto",
+      "expect_rejected": true,
+      "review_note": "CONFIRMED via manual testing (2026-09): typing exactly this many characters into Xero's Contact Name field triggered a message stating only 255 characters are allowed. Added as the paired invalid-side boundary value to ai-007's valid-side 255-character case -- classic ISTQB boundary value analysis, both sides of the same limit tested explicitly rather than assumed symmetric."
+    }
+  ]
+}

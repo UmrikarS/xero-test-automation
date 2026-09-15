@@ -1,0 +1,70 @@
+name: Test Suite
+
+on:
+  push:
+  pull_request:
+  schedule:
+    # Live UI journey runs on a schedule rather than every push, to respect
+    # Xero's rate limits and because a full browser login is slower/flakier
+    # than API calls -- a deliberate CI design decision, not an oversight.
+    - cron: '0 3 * * *'  # daily at 03:00 UTC
+
+jobs:
+  security-and-api-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run local SQL injection suite (no external creds needed)
+        run: pytest tests/security -v --html=reports/security-report.html --self-contained-html
+
+      - name: Run API tests against real Xero Demo Company
+        env:
+          XERO_CLIENT_ID: ${{ secrets.XERO_CLIENT_ID }}
+          XERO_CLIENT_SECRET: ${{ secrets.XERO_CLIENT_SECRET }}
+        run: pytest tests/api -v --html=reports/api-report.html --self-contained-html
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports
+          path: reports/
+
+  ui-journey-nightly:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'schedule'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          playwright install --with-deps chromium
+      - name: Restore saved authenticated session
+        # CI can't complete the MFA step interactively, so it can't log in
+        # from scratch. Instead, auth_state.json (produced once, locally, by
+        # save_auth_state.py -- see that file's docstring) is stored as a
+        # base64-encoded secret and restored here. When Xero's session
+        # eventually expires, this step will start failing; re-run
+        # save_auth_state.py locally, re-encode it (base64 -i auth_state.json),
+        # and update the XERO_AUTH_STATE_B64 secret.
+        run: echo "${{ secrets.XERO_AUTH_STATE_B64 }}" | base64 -d > auth_state.json
+      - name: Run full UI journey against Demo Company
+        env:
+          XERO_CLIENT_ID: ${{ secrets.XERO_CLIENT_ID }}
+          XERO_CLIENT_SECRET: ${{ secrets.XERO_CLIENT_SECRET }}
+        run: pytest tests/ui -v --html=reports/ui-report.html --self-contained-html
+      - name: Upload UI test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-test-report
+          path: reports/
