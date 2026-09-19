@@ -1,6 +1,6 @@
 # Xero Test Automation & QA Engineering Portfolio Project
 
-**A three-layer test automation suite  UI (Playwright), API (Pytest + requests), and security (OWASP SQL injection)  built end-to-end against a real, live Xero Demo Company, with every locator and edge case verified against the actual system rather than assumed from documentation.**
+**A three-layer test automation suite  UI (Playwright), API (Pytest + requests), and security (OWASP SQL injection)  built end-to-end against a real, live Xero Demo Company, with every locator and edge case verified against the actual system.**
 
 > Author: Sneha Umrikar · Software Testing & QA Engineering
 > [Findings Log](#findings--real-xero-behaviour-discovered-through-testing) · [AI-Assisted Testing](#ai-assisted-testing)
@@ -24,9 +24,7 @@
 
 ## Project Overview
 
-Most QA portfolio projects test a static demo app the author fully controls, so every locator, every validation rule, and every edge case behaves exactly as expected on the first try. That's a poor rehearsal for real QA work, where the system under test is someone else's, changes without notice, and frequently disagrees with what the documentation implies.
-
-This project deliberately does the harder version: it tests **Xero's real Demo Company**  a live, production-grade accounting platform with MFA-protected login, bot detection, dynamic per-organisation URLs, and undocumented validation quirks  across three layers:
+This project tests **Xero's real Demo Company**  a live, production-grade accounting platform with MFA-protected login, bot detection, dynamic per-organisation URLs, and undocumented validation quirks  across three layers:
 
 - **UI automation** (Playwright, Page Object Model)  the full login → invoice → reconcile → report journey
 - **API testing** (Python `requests` + Pytest)  direct calls against Xero's real Accounting API, with OAuth2 handled automatically
@@ -38,9 +36,9 @@ Every locator in this repository was either confirmed directly from a real Playw
 
 ## Why Xero
 
-Xero was chosen deliberately over a purpose-built practice app:
+Xero was chosen over a purpose-built practice app:
 
-- **Real complexity, not a tutorial sandbox.** MFA, bot detection, OAuth2, and a modern single-page-app frontend are exactly the obstacles a QA engineer meets on a real project  and each one required a genuine debugging process to solve, documented below rather than hidden.
+- **Real complexity** MFA, bot detection, OAuth2, and a modern single-page-app frontend are exactly the obstacles a QA engineer meets on a real project  and each one required a genuine debugging process to solve, documented below rather than hidden.
 - **A public, free Demo Company** with realistic financial data (invoices, contacts, bank transactions), so no synthetic dataset had to be built to get meaningful test coverage.
 - **A real, documented API** alongside the UI, making it possible to build a proper UI-to-data cross-validation test  verifying a number shown on a report page matches an independently-computed total from the API, the same principle used to validate a BI dashboard against its underlying warehouse query.
 
